@@ -3,23 +3,75 @@
 ## Feature
 
 * [X] Timer Inturepter (Clock)
+
   * [X] Change Clock (RAM) for SS change
   * [X] Change Clock Display (LCD) for SS change
   * [X] Check Alarm (HH==HH & MM==MM) for MM change
-
 * [X] LCD Display
+
   * [X] Clock Display
   * [X] Alarm Input Display
-
 * [X] Keypad Input
+
   * [X] Go to Alarm Insert mode (C)
   * [X] Input Alarm Time (HH MM)
   * [X] Multiple Alarm Input
-
 * [ ] Snooze Feature
-
 * [ ] Buzzer Feature
-
 * [ ] LED Random Pattern
+
   * [ ] Generate Random Pattern
   * [ ] Turn off Alarm with given Pattern
+
+## Challenges
+
+* Wisely use A, B. As multiple modules like LCD, Keypad, Alarm use A ans B , push pop was needed.
+* Timer Calculation
+
+
+$$
+f = 11.0592Hz
+$$
+
+$$
+T = 12/f = 1.085us
+$$
+
+$$
+t = 1s
+$$
+
+$$
+MC = \frac{t}{T} = 921,658.986
+$$
+
+$$
+MC = 65536 \times 14.06
+$$
+
+$$
+MC = (FFFF) \times (E)
+$$
+
+$$
+Timer 0 = 0000H
+$$
+
+$$
+TMOD = 01H
+$$
+
+After every 0E times of full Timer_0 rotation SS will Increment and other as so.
+$$
+Clock = HH-MM-SS-0E
+$$
+
+$$
+$$
+
+$$
+$$
+
+$$
+$$
+
