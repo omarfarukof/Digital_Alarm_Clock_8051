@@ -231,9 +231,9 @@ ALARM_RING_CHECK:
         LCALL LCD_CURSOR_LINE_2
         LCALL LCD_STR_PRINT
 
-        MOV R3, #03H
+        MOV R6, #03H
         MOV R1, #ALARM_CODE_0
-        MOV R4, #7D
+        MOV R7, #7D
         ALARM_RING_CHECK_AGAIN:
             LCALL KEY_GET_ASCII
             CJNE A, #'+', ALARM_RING_NOT_SNOOZE
@@ -244,7 +244,7 @@ ALARM_RING_CHECK:
             CLR C
             SUBB A, #30H
             MOV ALARM_CODE_TEMP, A
-            MOV A, R4
+            MOV A, R7
             LCALL LCD_CURSOR_LINE_2_POSITION_A
             MOV A, ALARM_CODE_TEMP
             LCALL LCD_WRITE_NUMBER
@@ -253,9 +253,9 @@ ALARM_RING_CHECK:
             CLR C
             SUBB A, @R1
             JNZ ALARM_RING_CHECK_START
-        INC R4
+        INC R7
         INC R1
-        DJNZ R3, ALARM_RING_CHECK_AGAIN
+        DJNZ R6, ALARM_RING_CHECK_AGAIN
         LCALL LCD_CLEAR_LINE_2
         LCALL ALARM_RING_STOP
         LCALL ALARM_INDEX_CLR
@@ -744,10 +744,10 @@ TIME_DELAY_1MS:
     RET
 
 TIME_DELAY_20MS:
-        ; FOR f = 11Hz => T = 1.09091us
-        ; ==> n = 20ms/T = 18333 = 3*L0.L1 + 3*L1 + 2 
-        ; ==> L1 = 23 & L0 = 255
-        MOV TIME_DELAY_L1_COUNT, #23
+        ; FOR f = 11.0592Hz => T = 1.085us
+        ; ==> n = 20ms/T = 18433 = 3*L0.L1 + 3*L1 + 2 
+        ; ==> L1 = 24 & L0 = 255
+        MOV TIME_DELAY_L1_COUNT, #24
     TIME_DELAY_20MS_L1:
         MOV TIME_DELAY_L0_COUNT, #255
     TIME_DELAY_20MS_L0:
@@ -930,6 +930,7 @@ KEY_IGNORE_NOISE:
         MOV A, KEYPAD_PORT
         ANL A, #0F0H
         CJNE A, #0F0H, KEY_IGNORE_NOISE_2
+        LCALL TIME_DELAY_20MS; DELAY 20MS
         LCALL TIME_DELAY_20MS; DELAY 20MS
     KEY_IGNORE_NOISE_2:
         MOV A, KEYPAD_PORT
