@@ -53,7 +53,7 @@
         ALARM_CODE_2    EQU 0FH
 
     ;BUZZER SETUP
-        BUZZER_PIN      BIT P1.7
+        BUZZER_PIN      BIT P0.0
     ; LED PINS
         LED_PORT    EQU P1  ; FROM PIN 0 TO 4
         LED_0   BIT P1.0
@@ -63,10 +63,10 @@
         LED_4   BIT P1.4
 
     ; LCD DISPLAY SETUP
-        LCD_P   EQU P0
-        LCD_RS  EQU P3.5
-        LCD_RW  EQU P3.6
-        LCD_E   EQU P3.7
+        LCD_P   EQU P2
+        LCD_RS  EQU P1.5
+        LCD_RW  EQU P1.6
+        LCD_E   EQU P1.7
         ; LCD DELAY
         LCD_DELAY_L0_ADDRESS    EQU 6FH
         LCD_DELAY_L0_COUNT      EQU 22H
@@ -75,7 +75,7 @@
         ; bool ( BIT ADDRESSABLE )
         IS_KEY_SINGLE_PRESS  BIT     07H
         ; PORT CONNECTION ==>> C(4-1)->P(7-4) + R(4-1)->P(3-0)
-        KEYPAD_PORT          EQU     P2
+        KEYPAD_PORT          EQU     P3
 
 
 
@@ -86,7 +86,7 @@
 ; ============== MAIN CODE START =====================
     ORG 30H
 MAIN:   ; MAIN CODE START
-    LCALL INTERRUPT_ENABLE
+    LCALL INTERUPT_ENABLE
     LCALL TIMER_0_ENABLE
     LCALL TIMER_1_ENABLE
     LCALL CLOCK_INIT
@@ -232,9 +232,9 @@ ALARM_RING_CHECK:
         LCALL LCD_CURSOR_LINE_2
         LCALL LCD_STR_PRINT
 
-        MOV R3, #03H
+        MOV R6, #03H
         MOV R1, #ALARM_CODE_0
-        MOV R4, #7D
+        MOV R7, #7D
         ALARM_RING_CHECK_AGAIN:
             LCALL KEY_GET_ASCII
             CJNE A, #'+', ALARM_RING_NOT_SNOOZE
@@ -245,7 +245,7 @@ ALARM_RING_CHECK:
             CLR C
             SUBB A, #30H
             MOV ALARM_CODE_TEMP, A
-            MOV A, R4
+            MOV A, R7
             LCALL LCD_CURSOR_LINE_2_POSITION_A
             MOV A, ALARM_CODE_TEMP
             LCALL LCD_WRITE_NUMBER
@@ -254,9 +254,9 @@ ALARM_RING_CHECK:
             CLR C
             SUBB A, @R1
             JNZ ALARM_RING_CHECK_START
-        INC R4
+        INC R7
         INC R1
-        DJNZ R3, ALARM_RING_CHECK_AGAIN
+        DJNZ R6, ALARM_RING_CHECK_AGAIN
         LCALL LCD_CLEAR_LINE_2
         LCALL ALARM_RING_STOP
         LCALL ALARM_INDEX_CLR
@@ -349,6 +349,23 @@ ALARM_CODE_SORT:
         XCH A, ALARM_CODE_1
     ALARM_CODE_1L2:
     RET
+; ALARM_GEN_STOP_CODE:
+;     MOV A, TL1
+;     LCALL ALARM_A_REM_5
+;     MOV ALARM_CODE_0, B
+    
+;     MOV A, TH1
+;     LCALL ALARM_A_REM_5
+;     MOV ALARM_CODE_1, B
+    
+;     ADD A, TL0
+;     ADD A, TL1
+;     ADD A, SP
+;     LCALL ALARM_A_REM_5
+;     MOV ALARM_CODE_2, B
+;     LCALL ALARM_CODE_SORT
+;     LCALL ALARM_STOP_LED_ON
+;     RET
 ALARM_GEN_STOP_CODE:
     MOV A, TL1
     LCALL ALARM_A_REM_5
@@ -732,7 +749,7 @@ TIMER_1_INIT_MODE_2:
     MOV TMOD, A
     RET
 
-INTERRUPT_ENABLE:
+INTERUPT_ENABLE:
     SETB IE.7
     RET
 TIMER_0_ENABLE:
@@ -741,7 +758,7 @@ TIMER_0_ENABLE:
 TIMER_1_ENABLE:
     SETB IE.3
     RET
-INTERRUPT_DISABLE:
+INTERUPT_DISABLE:
     CLR IE.7
     RET
 TIMER_0_DISABLE:
@@ -766,10 +783,10 @@ TIME_DELAY_1MS:
     RET
 
 TIME_DELAY_20MS:
-        ; FOR f = 11Hz => T = 1.09091us
-        ; ==> n = 20ms/T = 18333 = 3*L0.L1 + 3*L1 + 2 
-        ; ==> L1 = 23 & L0 = 255
-        MOV TIME_DELAY_L1_COUNT, #50
+        ; FOR f = 11.0592Hz => T = 1.085us
+        ; ==> n = 20ms/T = 18433 = 3*L0.L1 + 3*L1 + 2 
+        ; ==> L1 = 24 & L0 = 255
+        MOV TIME_DELAY_L1_COUNT, #24
     TIME_DELAY_20MS_L1:
         MOV TIME_DELAY_L0_COUNT, #255
     TIME_DELAY_20MS_L0:
@@ -787,14 +804,6 @@ LCD_CLEAR_LINE_2:
         DJNZ R1, LCD_CLEAR_LINE_2_AGAIN
     RET
 
-LCD_CLEAR_LINE_1:
-    MOV R1, #16D
-    LCALL LCD_CURSOR_LINE_1
-    LCD_CLEAR_LINE_1_AGAIN:
-        MOV A, #' '
-        LCALL LCD_WRITE_DATA
-        DJNZ R1, LCD_CLEAR_LINE_1_AGAIN
-    RET
 
 LCD_STR_PRINT:  
         ;MOV DPTR, #LCD_STR
@@ -944,7 +953,6 @@ KEY_GET_DECODE:
         ; TAKE ASCII VALUE INPUT FROM KEYPAD 
         MOV KEYPAD_PORT, #0F0H
         LCALL KEY_IGNORE_NOISE
-
         LCALL KEY_CHECK_COL     ; B = COLUMN INDEX
         ;MOV B, A
         LCALL KEY_CHECK_ROW     ; A = ROW INDEX
@@ -962,6 +970,7 @@ KEY_IGNORE_NOISE:
         ANL A, #0F0H
         CJNE A, #0F0H, KEY_IGNORE_NOISE_2
         LCALL TIME_DELAY_20MS; DELAY 20MS
+        ;LCALL TIME_DELAY_20MS; DELAY 20MS
     KEY_IGNORE_NOISE_2:
         MOV A, KEYPAD_PORT
         ANL A, #0F0H
@@ -1041,23 +1050,23 @@ KEY_CHECK_ROW:
         ; DB '1', '2' , ... ... , 0
     ; ---- ---- ----
     CLOCK_STR:
-        DB '00:00:00',0
+        DB "00:00:00",0
     KEYPAD_DATA:
-        DB '+' ,'=' ,'0' ,'C' ,'-' ,'3' ,'2' ,'1' ,'*' ,'6' ,'5' ,'4' ,'/' ,'9' ,'8' ,'7', 0
+        DB '7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', 'C', '0', '=', '+' , 0
         ;NOP
     ALARM_SETUP_STR:
-        DB '*Sh(0),S(1),D(2)',0
+        DB "*Sh(0),S(1),D(2)",0
     ALARM_SETUP_MODE_STR:
-        DB '+ Show Alarm',0, '+ SET Alarm ',0, '+ DEL Alarm ',0, '+ Exit Alarm',0
+        DB "+ Show Alarm",0, "+ SET Alarm ",0, "+ DEL Alarm ",0, "+ Exit Alarm",0
     ALARM_SET_INDEX_STR:
-        DB 'Alm Idx(0-4): ',0
+        DB "Alm Idx(0-4): ",0
     ALARM_SET_STR:
-        DB 'ALM at ',0
+        DB "ALM at ",0
     ALARM_SET_SNOOZE_STR:
-        DB 'Snoz= 5x:(1,2,3) ',0
+        DB "Snoz= 5x:(1,2,3) ",0
     ALARM_RING_STR:
-        DB 'CODE: ',0
+        DB "CODE: ",0
     ALARM_SNOOZE_DONE_STR:
-        DB 'SNOOZED',0
+        DB "SNOOZED",0
 PROG_END:
     END
