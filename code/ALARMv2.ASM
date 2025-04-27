@@ -1,0 +1,1043 @@
+    ORG 0
+    MOV SP, #70H
+    MOV PSW, #00H
+    SJMP MAIN
+
+    ; TIME_DELAY SETUP
+        TIME_DELAY_L0_COUNT EQU 55H
+        TIME_DELAY_L1_COUNT EQU 56H
+
+    ; TIMER / COUNTER
+    ORG 0BH     ; FOR TIMER_0
+        LCALL TIMER_0_SUB
+        RETI
+    ORG 1BH     ; FOR TIMER_1
+        ;LCALL TIMER_1_SUB
+        RETI
+
+    ; CLOCK SETUP
+        CLOCK_HH    EQU 57H
+        CLOCK_MM    EQU 58H
+        CLOCK_SS    EQU 59H
+        CLOCK_XX    EQU 5AH
+        TIME_XX     EQU 14D
+
+        CLOCK_HH_CHANGER BIT 00H
+        CLOCK_MM_CHANGER BIT 01H
+        CLOCK_SS_CHANGER BIT 02H
+    
+    ; ALARM
+        ALARM_0     EQU 40H
+        ;ALARM_COUNT EQU 50H
+
+        ALARM_TEMP_XH   EQU 0AH
+        ALARM_TEMP_XL   EQU 0BH
+        ALARM_CODE_TEMP   EQU 0CH
+
+        ALARM_CHECK_INDICATOR   BIT 03H
+        ALARM_RING_INDICATOR  BIT 09H
+        ALARM_SNOOZE_INDICATOR  BIT 0AH
+
+        ALARM_INDEX         EQU 51H
+        ALARM_RING_INDEX    EQU 52H
+        ALARM_INDEX_0   BIT 04H
+        ALARM_INDEX_1   BIT 05H
+        ALARM_INDEX_2   BIT 06H
+        ALARM_INDEX_3   BIT 08H
+        ALARM_INDEX_4   BIT 09H
+
+        ALARM_SNOOZE_0  EQU 5BH ; TO 5F
+
+        ALARM_CODE_0    EQU 0DH
+        ALARM_CODE_1    EQU 0EH
+        ALARM_CODE_2    EQU 0FH
+
+    ;BUZZER SETUP
+        BUZZER_PIN      BIT P1.7
+    ; LED PINS
+        LED_PORT    EQU P1  ; FROM PIN 0 TO 4
+        LED_0   BIT P1.0
+        LED_1   BIT P1.1
+        LED_2   BIT P1.2
+        LED_3   BIT P1.3
+        LED_4   BIT P1.4
+
+    ; LCD DISPLAY SETUP
+        LCD_P   EQU P0
+        LCD_RS  EQU P3.5
+        LCD_RW  EQU P3.6
+        LCD_E   EQU P3.7
+        ; LCD DELAY
+        LCD_DELAY_L0_ADDRESS    EQU 6FH
+        LCD_DELAY_L0_COUNT      EQU 22H
+    
+    ; KEYPAD SETUP
+        ; bool ( BIT ADDRESSABLE )
+        IS_KEY_SINGLE_PRESS  BIT     07H
+        ; PORT CONNECTION ==>> C(4-1)->P(7-4) + R(4-1)->P(3-0)
+        KEYPAD_PORT          EQU     P2
+
+
+
+    
+
+
+
+; ============== MAIN CODE START =====================
+    ORG 30H
+MAIN:   ; MAIN CODE START
+    LCALL INTERUPT_ENABLE
+    LCALL TIMER_0_ENABLE
+    LCALL TIMER_1_ENABLE
+    LCALL CLOCK_INIT
+    LCALL LCD_INIT
+    LCALL ALARM_INIT
+
+    LCALL LCD_CLEAR_LINE_1
+    LCALL LCD_CLEAR_LINE_2
+    LCALL LCD_CURSOR_LINE_1
+    MOV DPTR, #CLOCK_STR
+    LCALL LCD_STR_PRINT
+    LCALL I_CLOCK_LCD_DISPLAY
+
+    LCALL TIMER_0_INIT_MODE_1
+    MOV TH0, #0
+    MOV TL0, #0
+    SETB TR0
+    LCALL TIMER_1_INIT_MODE_1
+    MOV TH1, #0
+    MOV TL1, #0
+    SETB TR1
+
+
+    MAIN_HOLD:
+        JB ALARM_RING_INDICATOR, ALARM_RING_CHECK_HERE
+            LCALL ALARM_SETUP
+            SJMP MAIN_HOLD
+
+        ALARM_RING_CHECK_HERE:
+            LCALL ALARM_RING_CHECK
+            ;CLR ALARM_RING_INDICATOR
+
+    SJMP MAIN_HOLD
+
+    MAIN_END:   LJMP PROG_END;END
+; ============== MAIN CODE END ========================
+
+
+
+; ============== SUBROUTINE / FUNCTIONS ===============
+; ALARM
+ALARM_INIT:
+    CLR BUZZER_PIN
+    CLR ALARM_RING_INDICATOR
+    CLR ALARM_CHECK_INDICATOR
+    CLR ALARM_SNOOZE_INDICATOR
+    CLR ALARM_INDEX_0
+    CLR ALARM_INDEX_1
+    CLR ALARM_INDEX_2
+    CLR ALARM_INDEX_3
+    CLR ALARM_INDEX_4
+    LCALL ALARM_STOP_LED_OFF
+    RET
+
+I_ALARM_CHECK:
+    JNB ALARM_INDEX_0, ALARM_INDEX_CHECK_1
+        MOV ALARM_INDEX, #0
+        LCALL ALARM_CHECK_INDEX
+    ALARM_INDEX_CHECK_1:
+    JNB ALARM_INDEX_1, ALARM_INDEX_CHECK_2
+        MOV ALARM_INDEX, #1
+        LCALL ALARM_CHECK_INDEX
+    ALARM_INDEX_CHECK_2:    
+    JNB ALARM_INDEX_2, ALARM_INDEX_CHECK_3
+        MOV ALARM_INDEX, #2
+        LCALL ALARM_CHECK_INDEX
+    ALARM_INDEX_CHECK_3:    
+    JNB ALARM_INDEX_3, ALARM_INDEX_CHECK_4
+        MOV ALARM_INDEX, #3
+        LCALL ALARM_CHECK_INDEX
+    ALARM_INDEX_CHECK_4:    
+    JNB ALARM_INDEX_4, ALARM_INDEX_CHECK_END
+        MOV ALARM_INDEX, #4
+        LCALL ALARM_CHECK_INDEX
+    ALARM_INDEX_CHECK_END:
+        RET
+
+ALARM_CHECK_INDEX:
+    PUSH 1
+    LCALL ALARM_GET_ADDR
+    MOV R1, A
+
+    MOV A, @R1
+    CJNE A, CLOCK_HH, ALARM_CHECK_END
+    
+    INC R1
+    MOV A, @R1
+    CJNE A, CLOCK_MM, ALARM_CHECK_END
+
+    ; RUN ALARM -----------------
+    LCALL ALARM_RING_START
+    ; ---------------------------
+    ;LCALL ALARM_INDEX_CLR
+    
+    ALARM_CHECK_END:
+        POP 1
+        RET
+
+ALARM_GET_ADDR:
+    ;A = A_0 + 2*A_Idx
+    MOV A, ALARM_INDEX
+    RL A
+    ADD A, #ALARM_0
+    RET
+ALARM_GET_SNOOZE_ADDR:
+    MOV A, #ALARM_SNOOZE_0
+    ADD A, ALARM_INDEX
+    RET
+
+ALARM_SET_SNOOZE:
+    SETB ALARM_SNOOZE_INDICATOR
+    LCALL ALARM_RING_STOP
+    LCALL ALARM_GET_ADDR
+    MOV R0, A
+    INC R0  ; FOR MM 
+    LCALL ALARM_GET_SNOOZE_ADDR
+    MOV R1, A
+
+    MOV A, @R0
+    ADD A, @R1
+    CLR C
+    SUBB A, #60D
+    JC ALARM_SET_SNOOZE_MM_L60
+        ; IMPLEMENT JNC
+        MOV @R0, A
+        DEC R0  ; FOR HH
+        INC @R0
+        SJMP ALARM_SET_SNOOZE_END
+    ALARM_SET_SNOOZE_MM_L60:
+        ADD A, #60D
+        MOV @R0, A
+    ALARM_SET_SNOOZE_END:
+        MOV DPTR, #ALARM_SNOOZE_DONE_STR
+        LCALL LCD_CURSOR_LINE_2
+        LCALL LCD_STR_PRINT
+    RET
+ALARM_RING_CHECK:
+    ;PUSH 0
+    ;PUSH 1
+    MOV ALARM_INDEX, ALARM_RING_INDEX
+    ALARM_RING_CHECK_START:
+        LCALL LCD_CLEAR_LINE_2
+        MOV DPTR, #ALARM_RING_STR
+        LCALL LCD_CURSOR_LINE_2
+        LCALL LCD_STR_PRINT
+
+        MOV R3, #03H
+        MOV R1, #ALARM_CODE_0
+        MOV R4, #7D
+        ALARM_RING_CHECK_AGAIN:
+            LCALL KEY_GET_ASCII
+            CJNE A, #'+', ALARM_RING_NOT_SNOOZE
+            LCALL ALARM_SET_SNOOZE
+            SJMP ALARM_RING_CHECK_END
+            
+        ALARM_RING_NOT_SNOOZE:
+            CLR C
+            SUBB A, #30H
+            MOV ALARM_CODE_TEMP, A
+            MOV A, R4
+            LCALL LCD_CURSOR_LINE_2_POSITION_A
+            MOV A, ALARM_CODE_TEMP
+            LCALL LCD_WRITE_NUMBER
+
+            MOV A, ALARM_CODE_TEMP
+            CLR C
+            SUBB A, @R1
+            JNZ ALARM_RING_CHECK_START
+        INC R4
+        INC R1
+        DJNZ R3, ALARM_RING_CHECK_AGAIN
+        LCALL LCD_CLEAR_LINE_2
+        LCALL ALARM_RING_STOP
+        LCALL ALARM_INDEX_CLR
+    ALARM_RING_CHECK_END:
+    ;POP 1
+    ;POP 0
+    RET
+
+ALARM_STOP_LED_OFF:
+    CLR LED_0
+    CLR LED_1
+    CLR LED_2
+    CLR LED_3
+    CLR LED_4
+    RET
+ALARM_LED_INDEX:
+    ; ; MOV A, ALARM_CODE_0
+    ; MOV R3, A
+    ; CLR A
+    ; SETB C
+    ; ALARM_LED_INDEX_AGAIN:
+    ;     RLC A
+    ;     DJNZ R3, ALARM_LED_INDEX_AGAIN
+    CJNE A, #00H, ALARM_LED_INDEX_NOT_0
+        SETB LED_0
+    ALARM_LED_INDEX_NOT_0:
+    CJNE A, #01H, ALARM_LED_INDEX_NOT_1
+        SETB LED_1
+    ALARM_LED_INDEX_NOT_1:
+    CJNE A, #02H, ALARM_LED_INDEX_NOT_2
+        SETB LED_2
+    ALARM_LED_INDEX_NOT_2:
+    CJNE A, #03H, ALARM_LED_INDEX_NOT_3
+        SETB LED_3
+    ALARM_LED_INDEX_NOT_3:
+    CJNE A, #04H, ALARM_LED_INDEX_NOT_4
+        SETB LED_4
+    ALARM_LED_INDEX_NOT_4:
+    RET
+ALARM_STOP_LED_ON:
+    ; LED INDEX 0
+    MOV A, ALARM_CODE_0
+    LCALL ALARM_LED_INDEX
+    ;MOV B, A
+    ; LED INDEX 1
+    MOV A, ALARM_CODE_1
+    LCALL ALARM_LED_INDEX
+    ;ADD A, B
+    ;MOV B, A
+    ; LED INDEX 2
+    MOV A, ALARM_CODE_2
+    LCALL ALARM_LED_INDEX
+    ;ADD A, B
+
+    ;LCALL ALARM_LED_MASK
+    ;MOV 2AH, A
+    RET
+
+ALARM_A_REM_5:
+    ; MOV A, TH0 ;TL0 ;CLOCK_XX
+    MOV B, #05H
+    DIV AB
+    RET     ; RETURN B
+ALARM_CODE_SORT:
+    ; IF CODE_0 > CODE_1 => SWAP
+    MOV A, ALARM_CODE_0
+    CLR C
+    SUBB A, ALARM_CODE_1
+    JC ALARM_CODE_0L1
+        MOV A, ALARM_CODE_0
+        XCH A, ALARM_CODE_1
+        XCH A, ALARM_CODE_0
+    ALARM_CODE_0L1:
+    ; IF CODE_0 > CODE_2 => SWAP
+    MOV A, ALARM_CODE_0
+    CLR C
+    SUBB A, ALARM_CODE_2
+    JC ALARM_CODE_0L2
+        MOV A, ALARM_CODE_0
+        XCH A, ALARM_CODE_2
+        XCH A, ALARM_CODE_0
+    ALARM_CODE_0L2:
+    ; IF CODE_1 > CODE_2 = SWAP
+    MOV A, ALARM_CODE_1
+    CLR C
+    SUBB A, ALARM_CODE_2
+    JC ALARM_CODE_1L2
+        MOV A, ALARM_CODE_1
+        XCH A, ALARM_CODE_2
+        XCH A, ALARM_CODE_1
+    ALARM_CODE_1L2:
+    RET
+ALARM_GEN_STOP_CODE:
+    MOV A, TL1
+    LCALL ALARM_A_REM_5
+    MOV ALARM_CODE_0, B
+    
+    MOV A, TH1
+    LCALL ALARM_A_REM_5
+    MOV ALARM_CODE_1, B
+    
+    ADD A, TL0
+    ADD A, TL1
+    ADD A, SP
+    LCALL ALARM_A_REM_5
+    MOV ALARM_CODE_2, B
+    LCALL ALARM_CODE_SORT
+    LCALL ALARM_STOP_LED_ON
+    RET
+
+ALARM_RING_STOP:
+    CLR BUZZER_PIN
+    CLR ALARM_RING_INDICATOR
+    LCALL ALARM_STOP_LED_OFF
+    RET
+ALARM_RING_START:
+    MOV ALARM_RING_INDEX, ALARM_INDEX
+    SETB BUZZER_PIN
+    SETB ALARM_RING_INDICATOR
+    LCALL ALARM_GEN_STOP_CODE
+
+    RET
+; ALARM_LED_MASK:
+;     MOV B, A
+;     MOV A, #11100000B
+;     ANL A, LED_PORT
+;     ANL A, B
+;     MOV LED_PORT, A
+;     RET
+
+ALARM_SETUP:
+    PUSH 0E0H
+    PUSH 0F0H
+    LCALL KEY_GET_ASCII
+    JB ALARM_RING_INDICATOR, ALARM_SETUP_END
+    CJNE A, #'C', ALARM_SETUP_END
+
+    MOV DPTR, #ALARM_SETUP_STR
+    LCALL LCD_CURSOR_LINE_2
+    LCALL LCD_STR_PRINT
+
+    LCALL KEY_GET_NUMBER
+    LCALL LCD_CLEAR_LINE_2
+
+    JZ ALARM_SMOD_SHOW
+    CJNE A, #2, ALARM_SMOD_SET
+    SJMP ALARM_SMOD_DEL
+
+    ALARM_SMOD_SHOW:
+        ; INCOMPLETE CODE
+        SJMP ALARM_SETUP_END
+
+    ALARM_SMOD_SET:
+        MOV DPTR, #ALARM_SET_INDEX_STR
+        LCALL LCD_CURSOR_LINE_2
+        LCALL LCD_STR_PRINT
+
+        LCALL KEY_GET_NUMBER
+        MOV ALARM_INDEX, A
+        LCALL ALARM_INDEX_SETB
+
+        LCALL ALARM_SETUP_TAKE_INPUT
+
+        ALARM_SETUP_COMPLETE:
+            LCALL KEY_GET_ASCII
+            CLR C
+            SUBB A, #'='
+            JNZ ALARM_SETUP_COMPLETE
+        
+        MOV DPTR, #ALARM_SET_SNOOZE_STR
+        LCALL LCD_CURSOR_LINE_2
+        LCALL LCD_STR_PRINT
+        LCALL KEY_GET_NUMBER
+        MOV B, A    ; SNOOZE ID = 1/2/3
+        LCALL ALARM_GET_SNOOZE_ADDR
+        MOV R1, A
+        ;A = 5*B = 2*2*B +B
+        MOV A, B
+        RL A
+        RL A
+        ADD A, B
+        ; SAVE SNOOZE TIME
+        MOV @R1, A
+
+        LCALL LCD_CLEAR_LINE_2
+        SJMP ALARM_SETUP_END
+    
+    ALARM_SMOD_DEL:
+        ; INCOMPLETE CODE
+        ;SJMP ALARM_SETUP_END
+
+    ALARM_SETUP_END:
+        POP 0F0H
+        POP 0E0H
+        RET
+
+
+
+ALARM_INDEX_SETB:
+    MOV A, ALARM_INDEX
+    JNZ ALARM_INDEX_SET_G0
+        SETB ALARM_INDEX_0
+        RET
+    ALARM_INDEX_SET_G0:
+    CJNE A, #1, ALARM_INDEX_SET_G1
+        SETB ALARM_INDEX_1
+        RET
+    ALARM_INDEX_SET_G1:
+    CJNE A, #2, ALARM_INDEX_SET_G2
+        SETB ALARM_INDEX_2
+        RET
+    ALARM_INDEX_SET_G2:
+    CJNE A, #3, ALARM_INDEX_SET_G3
+        SETB ALARM_INDEX_3
+        RET
+    ALARM_INDEX_SET_G3:
+    ;CJNE A, #4, ALARM_INDEX_SET_G4
+        SETB ALARM_INDEX_4
+        RET
+ALARM_INDEX_CLR:
+    MOV A, ALARM_INDEX
+    JNZ ALARM_INDEX_CLR_G0
+        CLR ALARM_INDEX_0
+        RET
+    ALARM_INDEX_CLR_G0:
+    CJNE A, #1, ALARM_INDEX_CLR_G1
+        CLR ALARM_INDEX_1
+        RET
+    ALARM_INDEX_CLR_G1:
+    CJNE A, #2, ALARM_INDEX_CLR_G2
+        CLR ALARM_INDEX_2
+        RET
+    ALARM_INDEX_CLR_G2:
+    CJNE A, #3, ALARM_INDEX_CLR_G3
+        CLR ALARM_INDEX_3
+        RET
+    ALARM_INDEX_CLR_G3:
+    ;CJNE A, #4, ALARM_INDEX_CLR_G4
+        CLR ALARM_INDEX_4
+        RET
+
+ALARM_SETUP_TAKE_INPUT:
+    LCALL LCD_CLEAR_LINE_2
+    MOV DPTR, #ALARM_SET_STR
+    LCALL LCD_CURSOR_LINE_2
+    LCALL LCD_STR_PRINT
+    MOV A, ALARM_INDEX
+    LCALL LCD_WRITE_NUMBER
+    MOV A, #':'
+    LCALL LCD_WRITE_DATA
+
+    LCALL ALARM_GET_ADDR
+    MOV R1, A
+
+    MOV R2, #02H
+    MOV R3, #10D
+    ALARM_TAKE_INPUT:
+        ; 1ST DIGIT OF XX
+        LCALL KEY_GET_NUMBER
+        MOV ALARM_TEMP_XH, A
+        MOV A, R3
+        LCALL LCD_CURSOR_LINE_2_POSITION_A
+        MOV A, ALARM_TEMP_XH
+        LCALL LCD_WRITE_NUMBER
+        ; 2ND DIGIT OF XX
+        LCALL KEY_GET_NUMBER
+        MOV ALARM_TEMP_XL, A
+        MOV A, R3
+        INC A
+        LCALL LCD_CURSOR_LINE_2_POSITION_A
+        MOV A, ALARM_TEMP_XL
+        LCALL LCD_WRITE_NUMBER
+        ; XX = XH*A + XL
+        MOV A, #0AH
+        MOV B, ALARM_TEMP_XH
+        MUL AB
+        ADD A, ALARM_TEMP_XL
+        MOV @R1, A
+        INC R1
+        ; DISPLAY POSITIONING
+        INC R3
+        INC R3
+        INC R3
+        DJNZ R2, ALARM_TAKE_INPUT
+        RET
+
+; CLOCK
+; FOR f = 11.0592Hz 
+;   => T = 12/f = 1.085us
+;   => t = 1s
+;   => MC = t / T = 921_658.986
+;   => MC = 65536(FFFF) x 14.06(E)
+CLOCK_INIT:
+    MOV CLOCK_HH, #12D
+    MOV CLOCK_MM, #30D
+    MOV CLOCK_SS, #30D
+    MOV CLOCK_XX, #0D
+
+    SETB CLOCK_HH_CHANGER
+    SETB CLOCK_MM_CHANGER
+    SETB CLOCK_SS_CHANGER
+
+    RET
+
+I_CLOCK_LCD_DISPLAY:
+    PUSH 0E0H
+    PUSH 0F0H
+    ; PRINT CLOCK_HH
+    JNB CLOCK_HH_CHANGER, CLOCK_LCD_DISPLAY_MM
+    CLR CLOCK_HH_CHANGER
+    MOV A, #00D
+    LCALL LCD_CURSOR_LINE_1_POSITION_A
+    MOV A, CLOCK_HH
+    MOV B, #10D
+    DIV AB
+    LCALL LCD_WRITE_NUMBER
+    MOV A, B
+    LCALL LCD_WRITE_NUMBER
+
+    ; PRINT CLOCK_MM    
+    CLOCK_LCD_DISPLAY_MM:
+    JNB CLOCK_MM_CHANGER, CLOCK_LCD_DISPLAY_SS
+    CLR CLOCK_MM_CHANGER
+    MOV A, #03D
+    LCALL LCD_CURSOR_LINE_1_POSITION_A
+    MOV A, CLOCK_MM
+    MOV B, #10D
+    DIV AB
+    LCALL LCD_WRITE_NUMBER
+    MOV A, B
+    LCALL LCD_WRITE_NUMBER
+    
+    ; PRINT CLOCK_SS
+    CLOCK_LCD_DISPLAY_SS:
+    JNB CLOCK_SS_CHANGER, CLOCK_LCD_DISPLAY_END
+    CLR CLOCK_SS_CHANGER
+    MOV A, #06D
+    LCALL LCD_CURSOR_LINE_1_POSITION_A
+    MOV A, CLOCK_SS
+    MOV B, #10D
+    DIV AB
+    LCALL LCD_WRITE_NUMBER
+    MOV A, B
+    LCALL LCD_WRITE_NUMBER
+    
+
+    CLOCK_LCD_DISPLAY_END:
+        POP 0F0H
+        POP 0E0H
+        RET
+
+I_CLOCK_CHANGE:
+    PUSH 0
+    INC CLOCK_XX ; RUNNING CLOCK
+    ; ROTATION
+    MOV R0, #CLOCK_XX
+    CJNE @R0, #TIME_XX, CLOCK_CHANGE_END
+    MOV CLOCK_XX, #00H
+    INC CLOCK_SS
+    SETB CLOCK_SS_CHANGER
+
+    ; SECOND ROTATION
+    MOV R0, #CLOCK_SS
+    CJNE @R0, #60D, CLOCK_CHANGE_END
+    MOV CLOCK_SS, #00H
+    INC CLOCK_MM
+    SETB CLOCK_MM_CHANGER
+    SETB ALARM_CHECK_INDICATOR
+
+    ; MINUTE ROTATION
+    MOV R0, #CLOCK_MM
+    CJNE @R0, #60D, CLOCK_CHANGE_END
+    MOV CLOCK_MM, #00H
+    INC CLOCK_HH
+    SETB CLOCK_HH_CHANGER
+
+    ; HOUR ROTATION
+    MOV R0, #CLOCK_HH
+    CJNE @R0, #24D, CLOCK_CHANGE_END
+    MOV CLOCK_HH, #00H
+
+    CLOCK_CHANGE_END:
+        POP 0
+        RET
+
+
+
+; TIME CALCULATED DELAY
+TIMER_0_SUB:
+    ; TIMER_0 = TH0_TL0
+    ; START TIMER_0 => TR0 = 1
+    ; END TIMER_0 => TF0 = 1
+    ; ---- ---- ---- ---- ----
+    ; WRITE CODE HERE
+    LCALL I_CLOCK_CHANGE
+    LCALL I_CLOCK_LCD_DISPLAY
+
+    JNB ALARM_CHECK_INDICATOR, ALARM_CHECK_INDICATOR_END
+        LCALL I_ALARM_CHECK
+        CLR ALARM_CHECK_INDICATOR
+    ALARM_CHECK_INDICATOR_END:
+
+    ; JNB ALARM_RING_INDICATOR, ALARM_RING_INDICATOR_END
+    ;     LCALL ALARM_RING_CHECK
+    ;     CLR ALARM_RING_INDICATOR
+    ; ALARM_RING_INDICATOR_END:
+
+    TIMER_0_SUB_END:
+        RET
+
+TIMER_1_SUB:
+    ; TIMER_1 = TH1_TL1
+    ; START TIMER_1 => TR1 = 1
+    ; END TIMER_1 => TF1 = 1
+    ; ---- ---- ---- ---- ----
+    ; WRITE CODE HERE
+    RET
+
+TIMER_0_INIT_MODE_1:
+    ; TH0_TL0 = (FFFF - MC)
+    MOV A, TMOD
+    ANL A, #0F0H
+    ADD A, #01H ; MODE 1
+    MOV TMOD, A
+    RET
+
+TIMER_1_INIT_MODE_1:
+    ; TH0_TL0 = (FFFF - MC)
+    MOV A, TMOD
+    ANL A, #0FH
+    SWAP A
+    ADD A, #01H ; MODE 1
+    SWAP A
+    MOV TMOD, A
+    RET
+
+TIMER_0_INIT_MODE_2:
+    ; TH0 = (FF - MC)
+    MOV A, TMOD
+    ANL A, #0F0H
+    ADD A, #02H ; MODE 2
+    MOV TMOD, A
+    RET
+
+TIMER_1_INIT_MODE_2:
+    ; TH0 = (FF - MC)
+    MOV A, TMOD
+    ANL A, #0FH
+    SWAP A
+    ADD A, #02H ; MODE 2
+    SWAP A
+    MOV TMOD, A
+    RET
+
+INTERUPT_ENABLE:
+    SETB IE.7
+    RET
+TIMER_0_ENABLE:
+    SETB IE.1
+    RET
+TIMER_1_ENABLE:
+    SETB IE.3
+    RET
+INTERUPT_DISABLE:
+    CLR IE.7
+    RET
+TIMER_0_DISABLE:
+    CLR IE.1
+    RET
+TIMER_1_DISABLE:
+    CLR IE.3
+    RET
+
+
+TIME_DELAY_1MS:
+        ; FOR f = 11Hz => T = 12/f = 1.09091us
+        ; ==> n = 1ms/T = 916 = 3*L0.L1 + 3*L1 + 2 
+        ; ==> L1 = (916 - 2) / ( 3*L0 + 3 )
+        ; ==> L1 = 1 & L0 = 255
+        MOV TIME_DELAY_L1_COUNT, #1
+    TIME_DELAY_1MS_L1:
+        MOV TIME_DELAY_L0_COUNT, #255
+    TIME_DELAY_1MS_L0:
+        DJNZ TIME_DELAY_L0_COUNT, TIME_DELAY_1MS_L0
+        DJNZ TIME_DELAY_L1_COUNT, TIME_DELAY_1MS_L1
+    RET
+
+TIME_DELAY_20MS:
+        ; FOR f = 11Hz => T = 1.09091us
+        ; ==> n = 20ms/T = 18333 = 3*L0.L1 + 3*L1 + 2 
+        ; ==> L1 = 23 & L0 = 255
+        MOV TIME_DELAY_L1_COUNT, #50
+    TIME_DELAY_20MS_L1:
+        MOV TIME_DELAY_L0_COUNT, #255
+    TIME_DELAY_20MS_L0:
+        DJNZ TIME_DELAY_L0_COUNT, TIME_DELAY_20MS_L0
+        DJNZ TIME_DELAY_L1_COUNT, TIME_DELAY_20MS_L1
+    RET
+
+; FOR LCD
+LCD_CLEAR_LINE_2:
+    MOV R1, #16D
+    LCALL LCD_CURSOR_LINE_2
+    LCD_CLEAR_LINE_2_AGAIN:
+        MOV A, #' '
+        LCALL LCD_WRITE_DATA
+        DJNZ R1, LCD_CLEAR_LINE_2_AGAIN
+    RET
+
+LCD_CLEAR_LINE_1:
+    MOV R1, #16D
+    LCALL LCD_CURSOR_LINE_1
+    LCD_CLEAR_LINE_1_AGAIN:
+        MOV A, #' '
+        LCALL LCD_WRITE_DATA
+        DJNZ R1, LCD_CLEAR_LINE_1_AGAIN
+    RET
+
+LCD_STR_PRINT:  
+        ;MOV DPTR, #LCD_STR
+    LCD_STR_PRINT_AGAIN:
+        CLR A           ;set A=0 (match found)
+        MOVC A, @A+DPTR ;get ASCII code from table
+        JZ LSP_END
+        LCALL LCD_WRITE_DATA
+        INC DPTR
+        SJMP LCD_STR_PRINT_AGAIN
+    LSP_END:    
+        RET
+
+
+LCD_DELAY:
+        MOV LCD_DELAY_L0_ADDRESS, #LCD_DELAY_L0_COUNT
+    LCD_DELAY_L0:
+        DJNZ LCD_DELAY_L0_ADDRESS, LCD_DELAY_L0        
+        RET
+
+LCD_CMD:        
+        LCALL LCD_READY     ;send command to LCD
+        MOV LCD_P, A        ;copy reg A to port 1
+        CLR LCD_RS          ;LCD_RS=0 for command
+        CLR LCD_RW          ;R/W=0 for write
+        SETB LCD_E          ;LCD_E=1 for high pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        CLR LCD_E           ;LCD_E=0 for H-to-L pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        RET
+
+
+LCD_WRITE_DATA: 
+        LCALL LCD_READY     ;write data to LCD
+        MOV LCD_P, A        ;copy reg A to port1
+        SETB LCD_RS         ;LCD_RS=1 for data
+        CLR LCD_RW          ;R/W=0 for write
+        SETB LCD_E          ;LCD_E=1 for high pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        CLR LCD_E           ;LCD_E=0 for H-to-L pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        RET
+
+LCD_WRITE_NUMBER:  
+        LCALL LCD_READY     ;write data to LCD
+        ADD A, #30H         ;CONVERT ASCII NUM
+        MOV LCD_P, A        ;copy reg A to port1
+        SETB LCD_RS         ;LCD_RS=1 for data
+        CLR LCD_RW          ;R/W=0 for write
+        SETB LCD_E          ;LCD_E=1 for high pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        CLR LCD_E           ;LCD_E=0 for H-to-L pulse
+        LCALL LCD_DELAY     ;give LCD some time
+        RET
+
+LCD_READY:      
+        SETB LCD_P.7
+        CLR LCD_RS
+        SETB LCD_RW
+
+    LCD_WAIT:   
+        CLR LCD_E
+        LCALL LCD_DELAY
+        SETB LCD_E
+        JB LCD_P.7, LCD_WAIT
+        RET
+
+LCD_INIT:       
+    MOV A, #38H         ;init. LCD 2 lines, 5x7 matrix
+    ACALL LCD_CMD
+    LCALL LCD_CURSOR_OFF      ;dispplay on, cursor on
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_LINE_1:        
+    MOV A, #80H         ; CURSOR AT BEGINNING OF LINE 1
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_LINE_1_POSITION_A:
+    ; MOV A, #3 ; FOR 3RD POSITION OF LINE 1
+    ADD A, #80H         ; CURSOR AT A POSITION OF LINE 1
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_LINE_2:        
+    MOV A, #0C0H         ; CURSOR AT BEGINNING OF LINE 2
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_LINE_2_POSITION_A:
+    ; MOV A, #3 ; FOR 3RD POSITION OF LINE 2
+    ADD A, #0C0H         ; CURSOR AT A POSITION OF LINE 2
+    LCALL LCD_CMD
+    RET
+
+
+LCD_CURSOR_ON:        
+    MOV A, #0FH         ; Display on, cursor blinking
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_OFF:       
+    MOV A, #0CH         ; Display on, cursor off
+    LCALL LCD_CMD
+    RET
+
+LCD_CLEAR:        
+    MOV A, #01H         ; Clear Display screen
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_DEC:
+    MOV A, #04H         ; Decrement cursor (shift cursor to left)
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_INC:
+    MOV A, #06H         ; Increment cursor (shift cursor to right)
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_LEFT:
+    MOV A, #10H         ; Shift cursor position to left
+    LCALL LCD_CMD
+    RET
+
+LCD_CURSOR_RIGHT:
+    MOV A, #14H         ; Shift cursor position to left
+    LCALL LCD_CMD
+    RET
+
+; FOR KEYPAD
+KEY_GET_ASCII:
+    ; TAKE NUMBER INPUT FROM KEYPAD IN ASCII
+    LCALL KEY_GET_DECODE
+    RET
+
+KEY_GET_NUMBER:
+    ; TAKE NUMBER INPUT FROM KEYPAD
+    LCALL KEY_GET_DECODE
+    CLR C
+    SUBB A, #30H
+    RET
+
+KEY_GET_DECODE:        
+        ; TAKE ASCII VALUE INPUT FROM KEYPAD 
+        MOV KEYPAD_PORT, #0F0H
+        LCALL KEY_IGNORE_NOISE
+
+        LCALL KEY_CHECK_COL     ; B = COLUMN INDEX
+        ;MOV B, A
+        LCALL KEY_CHECK_ROW     ; A = ROW INDEX
+        PUSH 0F0H
+        MOV B, #04H
+        MUL AB
+        POP 0F0H
+        ADD A, B
+        MOV DPTR, #KEYPAD_DATA
+        MOVC A, @A+DPTR
+        RET
+
+KEY_IGNORE_NOISE:
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_IGNORE_NOISE_2
+        LCALL TIME_DELAY_20MS; DELAY 20MS
+    KEY_IGNORE_NOISE_2:
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_IGNORE_NOISE_RETURN
+        SJMP KEY_IGNORE_NOISE
+    KEY_IGNORE_NOISE_RETURN:
+        RET
+
+KEY_CHECK_COL:  
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_CHECK_SINGLE_PRESS_LABEL
+        CLR IS_KEY_SINGLE_PRESS
+        JMP KEY_CHECK_COL
+    KEY_CHECK_SINGLE_PRESS_LABEL:
+        JB IS_KEY_SINGLE_PRESS, KEY_CHECK_COL
+    KEY_CHECK_COLUMN_0:  
+        MOV B, #00H
+        CJNE A, #0E0H, KEY_CHECK_COLUMN_1
+        JMP KEY_CHECK_COLUMN_END
+    KEY_CHECK_COLUMN_1:  
+        INC B
+        CJNE A, #0D0H, KEY_CHECK_COLUMN_2
+        JMP KEY_CHECK_COLUMN_END
+    KEY_CHECK_COLUMN_2:  
+        INC B
+        CJNE A, #0B0H, KEY_CHECK_COLUMN_3
+        JMP KEY_CHECK_COLUMN_END
+    KEY_CHECK_COLUMN_3:  
+        INC B
+        ;CJNE A, #0F7H, KEY_CHECK_COLUMN_END
+        ;JMP KEY_CHECK_COLUMN_END
+    KEY_CHECK_COLUMN_END:
+        SETB IS_KEY_SINGLE_PRESS
+        RET
+
+KEY_CHECK_ROW: 
+        PUSH 0F0H
+    KEY_CHECK_ROW_0:
+        MOV B, #00H
+        SETB KEYPAD_PORT.0
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_CHECK_ROW_1
+        JMP KEY_CHECK_ROW_END
+    KEY_CHECK_ROW_1:
+        INC B
+        SETB KEYPAD_PORT.1
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_CHECK_ROW_2
+        JMP KEY_CHECK_ROW_END
+    KEY_CHECK_ROW_2:
+        INC B
+        SETB KEYPAD_PORT.2
+        MOV A, KEYPAD_PORT
+        ANL A, #0F0H
+        CJNE A, #0F0H, KEY_CHECK_ROW_3
+        JMP KEY_CHECK_ROW_END
+    KEY_CHECK_ROW_3:
+        INC B
+        ; SETB KEYPAD_PORT.3
+        ; MOV A, KEYPAD_PORT
+        ; ANL A, #0F0H
+        ; CJNE A, #0F0H, KEY_CHECK_ROW_END
+    KEY_CHECK_ROW_END:
+        MOV A, B
+        POP 0F0H
+        RET
+
+
+; =================== DATA LOOK UP TABLE =============================
+    ; END OF THE STRING HAS TO BE 0
+    
+    ; ---- ---- ----
+    ; TABLE_LABEL:
+        ; DB '1', '2' , ... ... , 0
+    ; ---- ---- ----
+    CLOCK_STR:
+        DB '00:00:00',0
+    KEYPAD_DATA:
+        DB '+' ,'=' ,'0' ,'C' ,'-' ,'3' ,'2' ,'1' ,'*' ,'6' ,'5' ,'4' ,'/' ,'9' ,'8' ,'7', 0
+        ;NOP
+    ALARM_SETUP_STR:
+        DB '*Sh(0),S(1),D(2)',0
+    ALARM_SETUP_MODE_STR:
+        DB '+ Show Alarm',0, '+ SET Alarm ',0, '+ DEL Alarm ',0, '+ Exit Alarm',0
+    ALARM_SET_INDEX_STR:
+        DB 'Alm Idx(0-4): ',0
+    ALARM_SET_STR:
+        DB 'ALM at ',0
+    ALARM_SET_SNOOZE_STR:
+        DB 'Snoz= 5x:(1,2,3) ',0
+    ALARM_RING_STR:
+        DB 'CODE: ',0
+    ALARM_SNOOZE_DONE_STR:
+        DB 'SNOOZED',0
+PROG_END:
+    END
