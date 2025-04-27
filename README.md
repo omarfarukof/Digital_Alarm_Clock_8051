@@ -18,14 +18,29 @@
   * [X] Multiple Alarm Input
 * [X] Snooze Feature
 * [X] Buzzer Feature
-* [X] Use Code to turn off Alarm
+* [X] Use Code to turn off Alarm (Match with Code saved in RAM )
 * [ ] LED Random Pattern
 
   * [ ] Generate Random Pattern
-  * [ ] Turn off Alarm with given Pattern
+  * [ ] Turn off Alarm with given Pattern (Save Code in RAM)
+
+## How to use:
+
+* [ ] Keypad - `C`  to goto setup mode.
+  * [ ] Keypad -  `0` -> to Show Alarms << Input Index of the Alarm
+  * [X] Keypad -  `1` -> to Set Alarms
+    * [X] Input Index of the Alarm
+    * [X] Input Time: `HH MM	`	=> Keypad - `=`	 -> To go next
+    * [X] Snooze Time 5min(1) / 10min(2) / 15min(3)  -> Input : 1/2/3
+  * [ ] Keypad -  `2` -> to Del Alarms << Input Index of the Alarm
+* [X] Stop/Snooze Alarm
+  * [X] Stop
+    * [X] Write Code Number
+  * [X] Snooze: ->  Keypad - `+`
 
 ## Challenges
 
+* Performing Multiple tasks parallel.
 * Wisely use A, B. As multiple modules like LCD, Keypad, Alarm use A ans B , push pop was needed.
 * Timer Calculation
 
