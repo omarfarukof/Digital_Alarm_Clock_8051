@@ -16,8 +16,9 @@
   * [X] Go to Alarm Insert mode (C)
   * [X] Input Alarm Time (HH MM)
   * [X] Multiple Alarm Input
-* [ ] Snooze Feature
-* [ ] Buzzer Feature
+* [X] Snooze Feature
+* [X] Buzzer Feature
+* [X] Use Code to turn off Alarm
 * [ ] LED Random Pattern
 
   * [ ] Generate Random Pattern
@@ -27,7 +28,6 @@
 
 * Wisely use A, B. As multiple modules like LCD, Keypad, Alarm use A ans B , push pop was needed.
 * Timer Calculation
-
 
 $$
 f = 11.0592Hz
@@ -62,16 +62,22 @@ TMOD = 01H
 $$
 
 After every 0E times of full Timer_0 rotation SS will Increment and other as so.
+
 $$
 Clock = HH-MM-SS-0E
 $$
 
 $$
+
+
 $$
 
 $$
+
+
 $$
 
 $$
-$$
 
+
+$$
