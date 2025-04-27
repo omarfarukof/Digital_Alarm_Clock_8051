@@ -21,8 +21,9 @@
 * [X] Use Code to turn off Alarm (Match with Code saved in RAM )
 * [ ] LED Random Pattern
 
-  * [ ] Generate Random Pattern
-  * [ ] Turn off Alarm with given Pattern (Save Code in RAM)
+  * [X] Generate Random Pattern
+  * [X] Turn off Alarm with given Pattern (Save Code in RAM)
+  * [ ] Turn on LED based on CODE PATTERN
 
 ## How to use:
 
