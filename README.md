@@ -19,10 +19,10 @@
 * [X] Snooze Feature
 * [X] Buzzer Feature
 * [X] Use Code to turn off Alarm (Match with Code saved in RAM )
-* [ ] LED Random Pattern
+* [X] LED Random Pattern
 
   * [X] Generate Random Pattern
-  * [ ] Turn off Alarm with given Pattern (Save Code in RAM)
+  * [X] Turn off Alarm with given Pattern (Save Code in RAM)
   * [X] Turn on LED based on CODE PATTERN
 
 ## How to use:
