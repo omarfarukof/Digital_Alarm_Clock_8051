@@ -27,13 +27,13 @@
 
 ## How to use:
 
-* [ ] Keypad - `C`  to goto setup mode.
-  * [ ] Keypad -  `0` -> to Show Alarms << Input Index of the Alarm
+* [X] Keypad - `C`  to goto setup mode.
+  * [X] Keypad -  `0` -> to Show Alarms << Input Index of the Alarm
   * [X] Keypad -  `1` -> to Set Alarms
     * [X] Input Index of the Alarm
     * [X] Input Time: `HH MM	`	=> Keypad - `=`	 -> To go next
     * [X] Snooze Time 5min(1) / 10min(2) / 15min(3)  -> Input : 1/2/3
-  * [ ] Keypad -  `2` -> to Del Alarms << Input Index of the Alarm
+  * [X] Keypad -  `2` -> to Del Alarms << Input Index of the Alarm
 * [X] Stop/Snooze Alarm
   * [X] Stop
     * [X] Write Code Number
